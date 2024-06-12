@@ -103,8 +103,22 @@ def fetch_ip(provider):
 
 
 def fetch_zone_id(zone_name, key):
-    headers = "Authorization: Bearer"
-    return "hello"
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json"
+    }
+    r = requests.get(f"https://api.cloudflare.com/client/v4/zones", headers=headers)
+    if r.status_code == 200:
+        data = json.loads(r.text)
+        results = data["result"]
+        for result in results:
+            if result["name"] == zone_name:
+                return result["id"]
+        print("Failed to find zone id, does this zone exist?")
+        return None
+    print(f"Error has occurred, status code: {r.status_code}")
+    print(r.text)
+    return None
 
 
 def run(scheduler, r_args, r_envs, r_zones):
@@ -114,7 +128,7 @@ def run(scheduler, r_args, r_envs, r_zones):
     for zone in r_zones.zones:
         user = zone.env
         if zone.zone_id is None:
-            zone.zone_id = fetch_zone_id(zone.zone_name)
+            zone.zone_id = fetch_zone_id(zone.zone_name, user.api_key)
 
 
 if __name__ == '__main__':
@@ -123,8 +137,10 @@ if __name__ == '__main__':
     if args.install:
         run_install()
     else:
-        user_envs = get_env(args.env)
-        zones = get_conf(args.config, user_envs)
-        runner = sched.scheduler(time.time, time.sleep)
-        runner.enter(args.time, 1, run, (runner, args, user_envs, zones))
-        runner.run()
+        m_user_envs = get_env(args.env)
+        m_zones = get_conf(args.config, m_user_envs)
+        for v_zone in m_zones.zones:
+            print(fetch_zone_id(v_zone.zone_name, v_zone.env.api_key))
+        #runner = sched.scheduler(time.time, time.sleep)
+        #runner.enter(args.time, 1, run, (runner, args, user_envs, zones))
+        #runner.run()
